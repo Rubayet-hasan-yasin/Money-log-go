@@ -1,0 +1,28 @@
+# Binaries
+bin/
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and coverage artifacts
+*.test
+*.out
+
+# Environment files
+.env
+!.env.example
+
+# Temporary and log files
+*.log
+build-errors.log
+reference_project_dump.txt
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
