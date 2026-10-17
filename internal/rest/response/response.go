@@ -94,13 +94,13 @@ func Error(c *gin.Context, err error) {
 	case domain.ErrNotFound:
 		statusCode = http.StatusNotFound
 		message = err.Error()
-	case domain.ErrAlreadyExists:
+	case domain.ErrAlreadyExists, domain.ErrEmailAlreadyInUse, domain.ErrUsernameAlreadyInUse:
 		statusCode = http.StatusConflict
 		message = err.Error()
 	case domain.ErrInvalidInput:
 		statusCode = http.StatusBadRequest
 		message = err.Error()
-	case domain.ErrUnauthorized:
+	case domain.ErrUnauthorized, domain.ErrInvalidCredentials, domain.ErrInvalidToken:
 		statusCode = http.StatusUnauthorized
 		message = err.Error()
 	case domain.ErrForbidden:

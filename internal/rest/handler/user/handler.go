@@ -29,6 +29,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	u, err := h.svc.Register(c.Request.Context(), user.RegisterInput{
 		Username: req.Username,
+		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
 	})

@@ -2,34 +2,31 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	userhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/user"
+	authhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/auth"
+	healthhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/health"
 	"github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/middleware"
 	"go.uber.org/zap"
 )
 
 func aPIVersionOne(
 	router *gin.Engine,
-	userHandler *userhandler.Handler,
+	healthHandler *healthhandler.Handler,
+	authHandler *authhandler.Handler,
 	log *zap.Logger,
 ) {
 	api := router.Group("/api/v1")
 	{
-		// Health check endpoint
-		api.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{
-				"status":  "ok",
-				"service": "go-backend-skeleton",
-			})
-		})
+		// Health check endpoints
+		healthhandler.RegisterRoutes(api, healthHandler)
 
-		// Public route group
-		userhandler.RegisterPublicRoutes(api, userHandler)
+		// Public route groups
+		authhandler.RegisterPublicRoutes(api, authHandler)
 
-		// Protected route group (authenticated via Bearer JWT)
+		// Protected route groups (authenticated via Bearer JWT)
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware(log))
 		{
-			userhandler.RegisterProtectedRoutes(protected, userHandler)
+			authhandler.RegisterProtectedRoutes(protected, authHandler)
 		}
 	}
 }

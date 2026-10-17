@@ -25,15 +25,24 @@ func NewService(repo Repository, log *zap.Logger) Service {
 
 func (s *service) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
 	email := strings.TrimSpace(strings.ToLower(input.Email))
-	username := strings.TrimSpace(input.Username)
+	username := strings.TrimSpace(strings.ToLower(input.Username))
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = username
+	}
 
 	if email == "" || username == "" || len(input.Password) < 6 {
 		return nil, domain.ErrInvalidInput
 	}
 
-	existing, _ := s.repo.FindByEmail(ctx, email)
-	if existing != nil {
-		return nil, domain.ErrAlreadyExists
+	existingEmail, _ := s.repo.FindByEmail(ctx, email)
+	if existingEmail != nil {
+		return nil, domain.ErrEmailAlreadyInUse
+	}
+
+	existingUsername, _ := s.repo.FindByUsername(ctx, username)
+	if existingUsername != nil {
+		return nil, domain.ErrUsernameAlreadyInUse
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -42,14 +51,17 @@ func (s *service) Register(ctx context.Context, input RegisterInput) (*domain.Us
 		return nil, domain.ErrInternalServer
 	}
 
+	hashStr := string(hashedPassword)
 	now := time.Now()
 	u := &domain.User{
-		ID:        uuid.New().String(),
-		Email:     email,
-		Username:  username,
-		Password:  string(hashedPassword),
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:           uuid.New().String(),
+		Email:        email,
+		Username:     username,
+		Password:     &hashStr,
+		Name:         name,
+		AuthProvider: domain.AuthProviderLocal,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 
 	if err := s.repo.Create(ctx, u); err != nil {
@@ -73,3 +85,11 @@ func (s *service) GetByEmail(ctx context.Context, email string) (*domain.User, e
 	}
 	return s.repo.FindByEmail(ctx, strings.ToLower(email))
 }
+
+func (s *service) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
+	if strings.TrimSpace(username) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	return s.repo.FindByUsername(ctx, strings.ToLower(username))
+}
+

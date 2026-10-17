@@ -7,13 +7,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rubayet-hasan-yasin/sceleton-go/internal/auth"
 	"github.com/rubayet-hasan-yasin/sceleton-go/internal/config"
 	"github.com/rubayet-hasan-yasin/sceleton-go/internal/infrastructure/db/postgres"
 	"github.com/rubayet-hasan-yasin/sceleton-go/internal/repository"
-	userhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/user"
+	authhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/auth"
+	healthhandler "github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/handler/health"
 	"github.com/rubayet-hasan-yasin/sceleton-go/internal/rest/middleware"
-	"github.com/rubayet-hasan-yasin/sceleton-go/internal/user"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 func runHTTPServer(ctx context.Context, cfg *config.Config, log *zap.Logger) error {
@@ -28,14 +31,35 @@ func runHTTPServer(ctx context.Context, cfg *config.Config, log *zap.Logger) err
 	defer conn.Close()
 	log.Info("Successfully connected to the database")
 
+	// Configure Google OAuth2 provider
+	var googleOAuthConfig *oauth2.Config
+	if cfg.OAuth.GoogleClientID != "" && cfg.OAuth.GoogleClientSecret != "" && cfg.OAuth.GoogleCallbackURL != "" {
+		googleOAuthConfig = &oauth2.Config{
+			ClientID:     cfg.OAuth.GoogleClientID,
+			ClientSecret: cfg.OAuth.GoogleClientSecret,
+			RedirectURL:  cfg.OAuth.GoogleCallbackURL,
+			Scopes: []string{
+				"https://www.googleapis.com/auth/userinfo.email",
+				"https://www.googleapis.com/auth/userinfo.profile",
+			},
+			Endpoint: google.Endpoint,
+		}
+		log.Info("Google OAuth provider configured")
+	} else {
+		log.Warn("Google OAuth credentials not configured; OAuth login disabled")
+	}
+
 	// Repositories
 	userRepo := repository.NewUserRepository(conn.DB, log)
+	categoryRepo := repository.NewCategoryRepository(conn.DB, log)
+	walletRepo := repository.NewWalletRepository(conn.DB, log)
 
 	// Domain Services
-	userSvc := user.NewService(userRepo, log)
+	authSvc := auth.NewService(userRepo, categoryRepo, walletRepo, log)
 
 	// REST Handlers
-	userHandler := userhandler.NewHandler(userSvc, log)
+	healthHandler := healthhandler.NewHandler(conn.DB, log)
+	authHandler := authhandler.NewHandler(authSvc, log, googleOAuthConfig)
 
 	// Router setup
 	router := gin.New()
@@ -45,7 +69,7 @@ func runHTTPServer(ctx context.Context, cfg *config.Config, log *zap.Logger) err
 	router.Use(middleware.RateLimiter(100, 5*time.Minute))
 
 	// API Routing
-	aPIVersionOne(router, userHandler, log)
+	aPIVersionOne(router, healthHandler, authHandler, log)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
